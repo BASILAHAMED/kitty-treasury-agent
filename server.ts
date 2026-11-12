@@ -387,7 +387,7 @@ Return ONLY valid JSON matching this schema:
       }
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.5-flash',
         contents: contentParts,
       });
 
@@ -395,7 +395,7 @@ Return ONLY valid JSON matching this schema:
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         parsedReceipt = JSON.parse(jsonMatch[0]);
-        providerUsed = 'Gemini 2.5 Flash Vision';
+        providerUsed = 'Gemini 3.5 Flash Vision';
       }
     } catch (e: any) {
       console.warn('Gemini vision error, falling back:', e.message);
