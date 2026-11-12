@@ -1,4 +1,4 @@
-# Kitty — Autonomous Shared-Treasury Agent
+# Kitty - Autonomous Shared-Treasury Agent
 
 Kitty is an autonomous financial agent for group treasuries (roommates, trips, and team offices). It combines AI vision and reasoning with PayPal Sandbox Invoicing and Orders APIs, plus Channel3 commerce product search, to eliminate manual spreadsheets and reminder messages.
 
