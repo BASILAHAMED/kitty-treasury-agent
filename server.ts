@@ -338,20 +338,7 @@ app.post('/api/ai/itemize-receipt', async (req: Request, res: Response) => {
   let parsedReceipt: any = null;
   let providerUsed = 'Simulator';
 
-  const geminiApiKey = process.env.GEMINI_API_KEY;
-  if (geminiApiKey && (imageBase64 || imageUrl)) {
-    try {
-      addReasoningStep({
-        flow: 'COLLECT',
-        stepType: 'tool_call',
-        title: 'Invoking Gemini 2.5 Flash Vision API',
-        detail: 'Calling @google/genai vision model with zero-shot receipt parsing prompt and structured JSON schema.',
-        toolName: 'gemini_vision_parse',
-        level: 'tool',
-      });
-
-      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-      const promptText = `Analyze this receipt image. Extract all individual line items, quantities, prices, subtotal, tax, tip, and total.
+  const promptText = `Analyze this receipt image. Extract all individual line items, quantities, prices, subtotal, tax, tip, and total.
 Also flag any item that appears shared or ambiguous (e.g. shared appetizers, bottle of wine, whole desserts) with "isAmbiguous": true and a brief "ambiguityReason".
 Return ONLY valid JSON matching this schema:
 {
@@ -373,6 +360,20 @@ Return ONLY valid JSON matching this schema:
     }
   ]
 }`;
+
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (geminiApiKey && (imageBase64 || imageUrl)) {
+    try {
+      addReasoningStep({
+        flow: 'COLLECT',
+        stepType: 'tool_call',
+        title: 'Invoking Gemini 2.5 Flash Vision API',
+        detail: 'Calling @google/genai vision model with zero-shot receipt parsing prompt and structured JSON schema.',
+        toolName: 'gemini_vision_parse',
+        level: 'tool',
+      });
+
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
       let contentParts: any[] = [{ text: promptText }];
       if (imageBase64) {
@@ -398,6 +399,63 @@ Return ONLY valid JSON matching this schema:
       }
     } catch (e: any) {
       console.warn('Gemini vision error, falling back:', e.message);
+    }
+  }
+
+  // Groq vision fallback/primary path (Llama-4 Scout supports image input via
+  // Groq's OpenAI-compatible chat completions API)
+  const groqApiKey = runtimeConfig.groqApiKey || process.env.GROQ_API_KEY;
+  if (!parsedReceipt && groqApiKey && (imageBase64 || imageUrl)) {
+    try {
+      addReasoningStep({
+        flow: 'COLLECT',
+        stepType: 'tool_call',
+        title: 'Invoking Groq Llama-4 Scout Vision API',
+        detail: 'Calling Groq chat completions (meta-llama/llama-4-scout-17b-16e-instruct) with zero-shot receipt parsing prompt and structured JSON schema.',
+        toolName: 'groq_vision_parse',
+        level: 'tool',
+      });
+
+      const imageContent = imageBase64
+        ? { type: 'image_url', image_url: { url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}` } }
+        : { type: 'image_url', image_url: { url: imageUrl } };
+
+      const groqResp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: promptText },
+                imageContent,
+              ],
+            },
+          ],
+          temperature: 0.2,
+          max_tokens: 1500,
+        }),
+      });
+
+      if (groqResp.ok) {
+        const groqData = await groqResp.json();
+        const text = groqData.choices?.[0]?.message?.content || '';
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsedReceipt = JSON.parse(jsonMatch[0]);
+          providerUsed = 'Groq Llama-4 Scout Vision';
+        }
+      } else {
+        const errText = await groqResp.text();
+        console.warn('Groq vision error:', errText);
+      }
+    } catch (e: any) {
+      console.warn('Groq vision error, falling back:', e.message);
     }
   }
 
@@ -648,26 +706,26 @@ app.post('/api/paypal/create-and-send-invoices', async (req: Request, res: Respo
               },
             },
           ],
-          items: s.items.map((it: any) => ({
-            name: it.description,
-            quantity: '1',
-            unit_amount: {
-              currency_code: 'USD',
-              value: it.amount.toFixed(2),
-            },
-          })),
-          amount: {
-            breakdown: {
-              item_total: {
+          items: [
+            ...s.items.map((it: any) => ({
+              name: it.description,
+              quantity: '1',
+              unit_amount: {
                 currency_code: 'USD',
-                value: s.subtotal.toFixed(2),
+                value: it.amount.toFixed(2),
               },
-              tax_total: {
-                currency_code: 'USD',
-                value: s.tax.toFixed(2),
-              },
-            },
-          },
+            })),
+            ...(s.tax > 0 ? [{
+              name: 'Tax (proportional share)',
+              quantity: '1',
+              unit_amount: { currency_code: 'USD', value: s.tax.toFixed(2) },
+            }] : []),
+            ...(s.tip > 0 ? [{
+              name: 'Tip (proportional share)',
+              quantity: '1',
+              unit_amount: { currency_code: 'USD', value: s.tip.toFixed(2) },
+            }] : []),
+          ],
         };
 
         const createRes = await fetch('https://api-m.sandbox.paypal.com/v2/invoicing/invoices', {

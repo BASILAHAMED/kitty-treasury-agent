@@ -8,7 +8,7 @@ export const DEFAULT_GROUPS: GroupKitty[] = [
     balance: 78.50,
     spendCap: 50.00,
     currency: 'USD',
-    organizerEmail: 'alex.organizer@sandbox.paypal.com',
+    organizerEmail: 'sb-mxcka50637138@business.example.com',
     members: [
       {
         id: 'member_alex',
@@ -51,7 +51,7 @@ export const DEFAULT_GROUPS: GroupKitty[] = [
     balance: 145.00,
     spendCap: 100.00,
     currency: 'USD',
-    organizerEmail: 'alex.organizer@sandbox.paypal.com',
+    organizerEmail: 'sb-mxcka50637138@business.example.com',
     members: [
       {
         id: 'member_alex',
