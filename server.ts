@@ -1385,7 +1385,8 @@ app.post('/api/reset-data', (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// Vite Dev Server / Static Asset Serving
+// Vite Dev Server / Static Asset Serving (skipped under Vercel serverless —
+// Vercel serves the static build directly and routes /api/* to this app)
 // ---------------------------------------------------------------------------
 async function startServer() {
   const isDev = process.env.NODE_ENV !== 'production';
@@ -1410,4 +1411,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
