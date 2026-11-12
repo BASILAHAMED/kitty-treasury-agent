@@ -1,0 +1,6 @@
+{
+  "name": "Kitty - Autonomous Shared Treasury Agent",
+  "description": "Autonomous group treasury powered by PayPal sandbox & AI. Handles receipt splitting (COLLECT) with PayPal Invoicing and automated shared purchasing (SPEND) via PayPal Orders.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
